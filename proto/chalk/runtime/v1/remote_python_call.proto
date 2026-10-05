@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package chalk.runtime.v1;
+
+option go_package = "github.com/chalk-ai/chalk-go-function/internal/gen/chalk/runtime/v1;runtimev1";
+
+// Subset of chalk-private's protos/chalk/runtime/v1/remote_python_call.proto:
+// the wire contract every Chalk external function server implements.
+
+message CallFunctionRequest {
+  string name = 1;
+  bytes feather_stream = 2;
+}
+
+message CallFunctionResponse {
+  bytes feather_stream = 1;
+}
+
+service RemoteCallService {
+  rpc CallFunction(stream CallFunctionRequest) returns (stream CallFunctionResponse) {}
+}

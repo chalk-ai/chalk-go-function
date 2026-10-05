@@ -1,0 +1,7 @@
+/chalkfn
+*.test
+*.out
+.DS_Store
+.env
+.idea/
+.vscode/
