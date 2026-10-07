@@ -49,58 +49,7 @@ func ArrowType[T Scalar]() arrow.DataType {
 	panic(fmt.Sprintf("chalkfn: no arrow type for %T", zero))
 }
 
-// Map1 builds a Function that applies fn to each row of a one-column input.
-// Rows where the input is null produce a null output without calling fn, and
-// an error from fn fails the whole batch.
-//
-//	chalkfn.Register(chalkfn.Map1("add_one", "x", "result",
-//		func(x int64) (int64, error) { return x + 1, nil }))
-func Map1[A, R Scalar](name, a, result string, fn func(A) (R, error)) Function {
-	return Function{
-		Name:   name,
-		Input:  Schema(Col(a, ArrowType[A]())),
-		Output: Schema(Col(result, ArrowType[R]())),
-		Fn: rowwise[R](func(cols []arrow.Array, out func(R), i int) error {
-			r, err := fn(valueAt[A](cols[0], i))
-			if err == nil {
-				out(r)
-			}
-			return err
-		}),
-	}
-}
-
-// Map2 is [Map1] for two input columns.
-func Map2[A, B, R Scalar](name, a, b, result string, fn func(A, B) (R, error)) Function {
-	return Function{
-		Name:   name,
-		Input:  Schema(Col(a, ArrowType[A]()), Col(b, ArrowType[B]())),
-		Output: Schema(Col(result, ArrowType[R]())),
-		Fn: rowwise[R](func(cols []arrow.Array, out func(R), i int) error {
-			r, err := fn(valueAt[A](cols[0], i), valueAt[B](cols[1], i))
-			if err == nil {
-				out(r)
-			}
-			return err
-		}),
-	}
-}
-
-// Map3 is [Map1] for three input columns.
-func Map3[A, B, C, R Scalar](name, a, b, c, result string, fn func(A, B, C) (R, error)) Function {
-	return Function{
-		Name:   name,
-		Input:  Schema(Col(a, ArrowType[A]()), Col(b, ArrowType[B]()), Col(c, ArrowType[C]())),
-		Output: Schema(Col(result, ArrowType[R]())),
-		Fn: rowwise[R](func(cols []arrow.Array, out func(R), i int) error {
-			r, err := fn(valueAt[A](cols[0], i), valueAt[B](cols[1], i), valueAt[C](cols[2], i))
-			if err == nil {
-				out(r)
-			}
-			return err
-		}),
-	}
-}
+//go:generate go run ../internal/cmd/genmaps -o maps_gen.go
 
 // rowwise lifts a per-row callback into a BatchFunc producing one column of
 // type R. A row with any null input yields a null output.
