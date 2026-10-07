@@ -3,6 +3,7 @@ package chalkfn
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -128,3 +129,31 @@ type boomError struct{}
 func (boomError) Error() string { return "boom" }
 
 var errBoom = boomError{}
+
+func TestInvokeMap9(t *testing.T) {
+	mem := memory.NewCheckedAllocator(memory.NewGoAllocator())
+	defer mem.AssertSize(t, 0)
+
+	f := Map9("nine", "a", "b", "c", "d", "e", "f", "g", "h", "i", "out",
+		func(a int8, b int16, c int32, d int64, e uint32, f float32, g float64, h bool, i string) (string, error) {
+			return strings.TrimSpace(fmt.Sprintln(a, b, c, d, e, f, g, h, i)), nil
+		})
+	if got := f.Input.NumFields(); got != 9 {
+		t.Fatalf("input has %d columns, want 9", got)
+	}
+	if got := f.Input.Field(7).Type; !arrow.TypeEqual(got, arrow.FixedWidthTypes.Boolean) {
+		t.Fatalf("column h has type %s, want bool", got)
+	}
+	in := ipcFromJSON(t, mem, f.Input, `[
+		{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6.5,"g":7.25,"h":true,"i":"x"},
+		{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6.5,"g":7.25,"h":true,"i":null}]`)
+	out, err := Invoke(context.Background(), mem, f, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := jsonFromIPC(t, out)
+	want := "{\"out\":\"1 2 3 4 5 6.5 7.25 true x\"}\n{\"out\":null}"
+	if got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+}
