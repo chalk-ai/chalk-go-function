@@ -52,7 +52,7 @@ func addOne(_ context.Context, mem memory.Allocator, in arrow.RecordBatch) (arro
 func main() { chalkfn.Serve() }
 ```
 
-For row-at-a-time functions over plain Go types, `Map1`, `Map2` and `Map3`
+For row-at-a-time functions over plain Go types, `Map1` through `Map9`
 derive the schemas from the Go signature. A row with a null input produces a
 null output without calling your function:
 
@@ -148,12 +148,14 @@ needs no direct connection to the scaling group.
 
 | Path | Purpose |
 |------|---------|
-| `chalkfn` | SDK: `Register`, `Function`, `Map1`/`Map2`/`Map3`, `Serve`, `Invoke` |
+| `chalkfn` | SDK: `Register`, `Function`, `Map1`–`Map9`, `Serve`, `Invoke` |
 | `cmd/chalkfn` | CLI: `deploy`, `call`, `run`, `functions`, `list`, `delete` |
 | `internal/arrowjson` | Arrow schema ⇄ `chalk.arrow.v1.Schema` JSON |
 | `internal/gen` | Generated `chalk.runtime.v1` stubs (`go generate ./internal/gen`) |
+| `internal/cmd/genmaps` | Generates `chalkfn/maps_gen.go` (`go generate ./chalkfn`) |
 | `examples/add_one` | Batch-level example |
 | `examples/scalar` | `Map1`/`Map2` example |
+| `e2etests` | Integration test that deploys to a real environment (`-tags e2e`) |
 
 ## Supported Arrow types
 
@@ -173,6 +175,31 @@ parse.
   remotely, and the CLI rejects them. Private modules need to be fetchable
   from the remote build without credentials.
 - Images are built for linux/amd64.
+
+## Continuous integration
+
+Buildkite runs two pipelines from `.buildkite/`. The
+`.github/workflows/sync-buildkite.yml` workflow syncs them to Buildkite with
+[buildkite-sync-action](https://github.com/chalk-ai/buildkite-sync-action)
+whenever `.buildkite/` changes on `main`.
+
+| Pipeline | Runs |
+|----------|------|
+| `chalk-go-function-unit-tests` | gofmt, `go vet`, generated-code and `go mod tidy` checks, `go test -race ./...` |
+| `chalk-go-function-integration-tests` | `e2etests` against staging and meta-ci |
+
+The integration test deploys `e2etests/fixture` with the CLI, calls each
+function through the API server, redeploys one function and checks that the
+redeploy used the cached image and created version 2, then deletes everything
+it deployed. Function names end in a random suffix, so concurrent runs do not
+collide. Run it yourself with Chalk credentials in the environment:
+
+```bash
+go test -tags e2e -v -timeout 40m ./e2etests
+```
+
+CI credentials are in `.env.enc` (staging) and `.env.meta-ci.enc` (meta-ci),
+encrypted with sops and the `chalk-ci-testing` KMS key in `.sops.yaml`.
 
 ## Testing your function
 

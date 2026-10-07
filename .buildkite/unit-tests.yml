@@ -1,0 +1,44 @@
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
+
+env:
+  GO_VERSION: "1.26.8"
+
+steps:
+  - label: ":go: Static checks"
+    command: |
+      set -euo pipefail
+      echo "--- :go: Bootstrap toolchain"
+      source .buildkite/install-go.sh
+      echo "--- :sparkles: gofmt gate"
+      unformatted="$$(gofmt -l .)"
+      if [ -n "$$unformatted" ]; then
+        echo "Files need gofmt:" >&2
+        echo "$$unformatted" >&2
+        exit 1
+      fi
+      echo "--- :mag: go vet gate"
+      go vet ./...
+      go vet -tags e2e ./e2etests
+      echo "--- :gear: Generated Map helpers are current"
+      (cd chalkfn && go generate ./...)
+      git diff --exit-code -- chalkfn/maps_gen.go
+      echo "--- :package: go.mod is tidy"
+      go mod tidy -diff
+    agents:
+      queue: default
+    timeout_in_minutes: 10
+
+  - label: ":go: Unit tests"
+    command: |
+      set -euo pipefail
+      echo "--- :go: Bootstrap toolchain"
+      source .buildkite/install-go.sh
+      echo "--- :test_tube: go test"
+      go test -race ./...
+    agents:
+      queue: default
+    timeout_in_minutes: 10
